@@ -87,6 +87,24 @@ def main():
         # Object(HEAVY_MASS, np.array([-500, 0]), np.array([0, -100])),
     ]
 
+    print("1. Triangle")
+    print("2. Simplified Solar System")
+    print("3. Two planet gravitating each other.")
+    choice = input("Enter>>")
+
+    if choice == "1":
+        objects.append(Object(HEAVY_MASS, np.array([0, 0]), np.array([v, 0])))
+        objects.append(Object(HEAVY_MASS, np.array([500, 500 * (3 ** 0.5)]), np.array([-v / 2, v / 2 * (3 ** 0.5)])))
+        objects.append(Object(HEAVY_MASS, np.array([-500, 500 * (3 ** 0.5)]), np.array([-v / 2, -v / 2 * (3 ** 0.5)])))
+    elif choice == "2":
+        objects.append(Object(HEAVIER_MASS, np.array([0, 0]), np.array([100, 0])))
+        objects.append(Object(HEAVY_MASS, np.array([10000, 0]), np.array([100, (G * HEAVIER_MASS / 10000) ** 0.5])))
+        objects.append(Object(LIGHT_MASS, np.array([10100, 0]),
+                              np.array([100, (G * HEAVY_MASS / 100) ** 0.5 + (G * HEAVIER_MASS / 10000) ** 0.5])))
+    elif choice == "3":
+        objects.append(Object(HEAVY_MASS, np.array([500, 0]), np.array([0, 100])))
+        objects.append(Object(HEAVY_MASS, np.array([-500, 0]), np.array([0, -100])))
+
     pygame.init()
     screen = pygame.display.set_mode(SIZE)
     tracing = False
