@@ -119,6 +119,8 @@ def main():
     next_mass = 0
 
     show_physical_quantity = True
+    follow_object= False
+    follow_num = 0
 
     zoom = 1
     screen.fill(WHITE)
@@ -150,6 +152,10 @@ def main():
                     tracing = not tracing
                 elif event.key == pygame.K_p:
                     show_physical_quantity = not show_physical_quantity
+                elif event.key == pygame.K_f:
+                    follow_object = not follow_object
+                elif event.key == pygame.K_g:
+                    follow_num += 1
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == pygame.BUTTON_LEFT or event.button == pygame.BUTTON_MIDDLE:
                     if prepare_object:
@@ -162,6 +168,11 @@ def main():
 
         if not tracing:
             screen.fill(WHITE)
+
+        if follow_object and len(objects) > 0:
+            if follow_num >= len(objects):
+                follow_num = 0
+            screen_center = -objects[follow_num].coord + CENTER_VECTOR
 
         if moving_screen:
             screen_center = screen_center + to_original_coord(np.array(pygame.mouse.get_pos()), screen_center,
