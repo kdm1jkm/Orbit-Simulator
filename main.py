@@ -1,29 +1,36 @@
-import pygame
-from pygame.locals import *
-from typing import *
-import numpy as np
 import math
 import sys
+from typing import *
 
+import numpy as np
+import pygame
+
+# 각종 상수들
+
+# 1회당 확대율
 ZOOM_RATE = 1.5
 
+# 질량들
 LIGHTER_MASS = 10 ** 5
 LIGHT_MASS = 10 ** 10
 HEAVY_MASS = 10 ** 18
 HEAVIER_MASS = 10 ** 22
 
-G = 6.67384 * 10 ** (-11)
-
 SUN_MASS = 1.989 * (10 ** 30)
 EARTH_MASS = 5.972 * (10 ** 24)
 MOON_MASS = 7.347673 * (10 ** 22)
 
+# 중력상수
+G = 6.67384 * 10 ** (-11)
+
+# 색
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 
+# 화면 크기, 중심 위치
 SIZE = (1280, 720)
 # SIZE = (1920, 1080)
 CENTER = (SIZE[0] / 2, SIZE[1] / 2)
@@ -67,32 +74,16 @@ def main():
     dt = 0.01
     fps = int(1 / dt)
 
-    v = (G * HEAVY_MASS / 1000) ** 0.5
+    objects: List[Optional[Object]] = []
 
-    objects: Optional[List[Object]] = [
-        # Object(HEAVY_MASS, np.array([0, 0]), np.array([v, 0])),
-        # Object(HEAVY_MASS, np.array([500, 500 * (3 ** 0.5)]), np.array([-v / 2, v / 2 * (3 ** 0.5)])),
-        # Object(HEAVY_MASS, np.array([-500, 500 * (3 ** 0.5)]), np.array([-v / 2, -v / 2 * (3 ** 0.5)])),
-
-        # Object(HEAVIER_MASS, np.array([0, 0]), np.array([100, 0])),
-        # Object(HEAVY_MASS, np.array([10000, 0]), np.array([100, (G * HEAVIER_MASS / 10000) ** 0.5])),
-        # Object(LIGHT_MASS, np.array([10100, 0]),
-        #        np.array([100, (G * HEAVY_MASS / 100) ** 0.5 + (G * HEAVIER_MASS / 10000) ** 0.5])),
-
-        # Object(SUN_MASS, np.array([0, 0]), np.array([0, 0])),
-        # Object(EARTH_MASS, np.array([1000, 0]), np.array([0, (G * SUN_MASS / 1000) ** 0.5])),
-        # Object(MOON_MASS, np.array([100100, 0]), np.array([0, (G * EARTH_MASS / 100) ** 0.5])),
-
-        # Object(HEAVY_MASS, np.array([500, 0]), np.array([0, 100])),
-        # Object(HEAVY_MASS, np.array([-500, 0]), np.array([0, -100])),
-    ]
-
+    print("Choose sample(Enter nothing to start with blank screen)")
     print("1. Triangle")
     print("2. Simplified Solar System")
     print("3. Two planet gravitating each other.")
     choice = input("Enter>>")
 
     if choice == "1":
+        v = (G * HEAVY_MASS / 1000) ** 0.5
         objects.append(Object(HEAVY_MASS, np.array([0, 0]), np.array([v, 0])))
         objects.append(Object(HEAVY_MASS, np.array([500, 500 * (3 ** 0.5)]), np.array([-v / 2, v / 2 * (3 ** 0.5)])))
         objects.append(Object(HEAVY_MASS, np.array([-500, 500 * (3 ** 0.5)]), np.array([-v / 2, -v / 2 * (3 ** 0.5)])))
@@ -107,22 +98,22 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode(SIZE)
-    tracing = False
     clock = pygame.time.Clock()
-    prepare_object = False
-    pos = np.array([0, 0])
 
-    screen_center = CENTER_VECTOR
+    pos = np.array([0, 0])
     mouse_start = np.array([0, 0])
-    moving_screen = False
+    screen_center = CENTER_VECTOR
 
     next_mass = 0
-
-    show_physical_quantity = True
-    follow_object= False
     follow_num = 0
-
     zoom = 1
+
+    tracing = False
+    prepare_object = False
+    moving_screen = False
+    show_physical_quantity = True
+    follow_object = False
+
     screen.fill(WHITE)
 
     while True:
@@ -131,56 +122,81 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
+
                 if event.button == pygame.BUTTON_LEFT:
                     pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
                     prepare_object = True
                     next_mass = LIGHT_MASS
+
                 elif event.button == pygame.BUTTON_RIGHT:
                     mouse_start = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
                     moving_screen = True
+
                 elif event.button == pygame.BUTTON_WHEELDOWN:
                     zoom /= ZOOM_RATE
+
                 elif event.button == pygame.BUTTON_WHEELUP:
                     zoom *= ZOOM_RATE
+
                 elif event.button == pygame.BUTTON_MIDDLE:
                     pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
                     prepare_object = True
                     next_mass = HEAVY_MASS
+
             elif event.type == pygame.KEYDOWN:
+
                 if event.key == pygame.K_t:
                     tracing = not tracing
+
                 elif event.key == pygame.K_p:
                     show_physical_quantity = not show_physical_quantity
+
                 elif event.key == pygame.K_f:
                     follow_object = not follow_object
+
                 elif event.key == pygame.K_g:
+                    follow_num -= 1
+
+                elif event.key == pygame.K_h:
                     follow_num += 1
+
+                elif event.key == pygame.K_d:
+                    if follow_object and len(objects) > 0:
+                        objects.pop(follow_num)
+
             elif event.type == pygame.MOUSEBUTTONUP:
+
                 if event.button == pygame.BUTTON_LEFT or event.button == pygame.BUTTON_MIDDLE:
                     if prepare_object:
                         prepare_object = False
                         objects.append(Object(next_mass, pos,
                                               to_original_coord(np.array(pygame.mouse.get_pos()), screen_center,
                                                                 zoom) - pos))
+
                 elif event.button == pygame.BUTTON_RIGHT:
                     moving_screen = False
 
         if not tracing:
             screen.fill(WHITE)
 
+        if follow_num >= len(objects):
+            follow_num = 0
+        elif follow_num < 0:
+            follow_num = len(objects) - 1
+
         if follow_object and len(objects) > 0:
-            if follow_num >= len(objects):
-                follow_num = 0
             screen_center = -objects[follow_num].coord + CENTER_VECTOR
 
         if moving_screen:
-            screen_center = screen_center + to_original_coord(np.array(pygame.mouse.get_pos()), screen_center,
-                                                              zoom) - mouse_start
+            screen_center = \
+                screen_center + to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom) - mouse_start
             mouse_start = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
 
         if prepare_object and len(objects) > 0:
-            pygame.draw.circle(screen, BLACK, to_screen_coord(pos, screen_center, zoom), int(10 * zoom))
+            pygame.draw.circle(screen, BLACK, to_screen_coord(pos, screen_center, zoom),
+                               int(next_mass ** (1 / 14) * zoom) + 2)
             pygame.draw.line(screen, RED, to_screen_coord(pos, screen_center, zoom),
                              pygame.mouse.get_pos(), int(3 * zoom) + 1)
             temp_o = Object(next_mass, pos, np.array([0, 0]))
@@ -206,7 +222,11 @@ def main():
                              to_screen_coord(guide2, screen_center, zoom))
 
         for o in objects:
-            pygame.draw.circle(screen, BLACK, to_screen_coord(o.coord, screen_center, zoom),
+            if o == objects[follow_num] and follow_object:
+                color = BLUE
+            else:
+                color = BLACK
+            pygame.draw.circle(screen, color, to_screen_coord(o.coord, screen_center, zoom),
                                int(o.mass ** (1 / 14) * zoom) + 2)
             if show_physical_quantity:
                 pygame.draw.line(screen, RED, to_screen_coord(o.coord, screen_center, zoom),
