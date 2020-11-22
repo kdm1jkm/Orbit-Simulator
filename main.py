@@ -1,9 +1,12 @@
 import math
 import sys
 from typing import *
+from enum import Enum
 
 import numpy as np
 import pygame
+
+from Object import Object
 
 # 각종 상수들
 
@@ -19,6 +22,8 @@ HEAVIER_MASS = 10 ** 22
 SUN_MASS = 1.989 * (10 ** 30)
 EARTH_MASS = 5.972 * (10 ** 24)
 MOON_MASS = 7.347673 * (10 ** 22)
+
+MASS_RATE = 10
 
 # 중력상수
 G = 6.67384 * 10 ** (-11)
@@ -37,29 +42,36 @@ CENTER = (SIZE[0] / 2, SIZE[1] / 2)
 CENTER_VECTOR = np.array(CENTER)
 
 
-class Object:
-    def __init__(self, mass: float, coord, velocity) -> None:
-        self.mass: float = mass
-        self.coord: np.ndarray[float, float] = coord
-        self.velocity: np.ndarray[float, float] = velocity
+class ObjectExample(Enum):
+    TRIANGLE = 1
+    SIMPLIFIED_SOLAR_SYSTEM = 2
+    TWO_OBJECT_GRAVITATING = 3
+    PERFECT_CIRCLE = 4
 
-    def move(self, dt: float):
-        self.coord = self.coord + self.velocity * dt
 
-    def calc_acc(self, subject):
-        subject: Object = subject
-        delta_coord: np.ndarray[float, float] = self.coord - subject.coord
-        r = math.sqrt(np.sum(delta_coord ** 2))
-        if r == 0:
-            return delta_coord
-        a = G * self.mass / (r ** 2)
-        vector_a: np.ndarray[float, float] = delta_coord / r * a
-        return vector_a
-
-    def gravitate(self, subject, dt: float):
-        vector_a = self.calc_acc(subject)
-        subject.velocity = subject.velocity + vector_a * dt
-        return vector_a
+TRIANGLE_V = (G * HEAVY_MASS / 1000) ** 0.5
+OBJECT_EXAMPLES: Dict[ObjectExample, List[Object]] = {
+    ObjectExample.TRIANGLE: [
+        Object(HEAVY_MASS, np.array([0, 0]), np.array([TRIANGLE_V, 0])),
+        Object(HEAVY_MASS, np.array([500, 500 * (3 ** 0.5)]), np.array([-TRIANGLE_V / 2, TRIANGLE_V / 2 * (3 ** 0.5)])),
+        Object(HEAVY_MASS, np.array([-500, 500 * (3 ** 0.5)]),
+               np.array([-TRIANGLE_V / 2, -TRIANGLE_V / 2 * (3 ** 0.5)])),
+    ],
+    ObjectExample.SIMPLIFIED_SOLAR_SYSTEM: [
+        Object(HEAVIER_MASS, np.array([0, 0]), np.array([100, 0])),
+        Object(HEAVY_MASS, np.array([10000, 0]), np.array([100, (G * HEAVIER_MASS / 10000) ** 0.5])),
+        Object(LIGHT_MASS, np.array([10100, 0]),
+               np.array([100, (G * HEAVY_MASS / 100) ** 0.5 + (G * HEAVIER_MASS / 10000) ** 0.5])),
+    ],
+    ObjectExample.TWO_OBJECT_GRAVITATING: [
+        Object(HEAVY_MASS, np.array([500, 0]), np.array([0, 100])),
+        Object(HEAVY_MASS, np.array([-500, 0]), np.array([0, -100])),
+    ],
+    ObjectExample.PERFECT_CIRCLE: [
+        Object(HEAVY_MASS, np.array([0, 0]), np.array([0, 0])),
+        Object(LIGHT_MASS, np.array([500, 0]), np.array([0, (G * HEAVY_MASS / 500) ** 0.5]))
+    ]
+}
 
 
 def to_screen_coord(coord: np.ndarray, screen_center: np.ndarray, zoom: float):
@@ -80,21 +92,17 @@ def main():
     print("1. Triangle")
     print("2. Simplified Solar System")
     print("3. Two planet gravitating each other.")
+    print("4. Perfect Circle")
     choice = input("Enter>>")
 
-    if choice == "1":
-        v = (G * HEAVY_MASS / 1000) ** 0.5
-        objects.append(Object(HEAVY_MASS, np.array([0, 0]), np.array([v, 0])))
-        objects.append(Object(HEAVY_MASS, np.array([500, 500 * (3 ** 0.5)]), np.array([-v / 2, v / 2 * (3 ** 0.5)])))
-        objects.append(Object(HEAVY_MASS, np.array([-500, 500 * (3 ** 0.5)]), np.array([-v / 2, -v / 2 * (3 ** 0.5)])))
-    elif choice == "2":
-        objects.append(Object(HEAVIER_MASS, np.array([0, 0]), np.array([100, 0])))
-        objects.append(Object(HEAVY_MASS, np.array([10000, 0]), np.array([100, (G * HEAVIER_MASS / 10000) ** 0.5])))
-        objects.append(Object(LIGHT_MASS, np.array([10100, 0]),
-                              np.array([100, (G * HEAVY_MASS / 100) ** 0.5 + (G * HEAVIER_MASS / 10000) ** 0.5])))
-    elif choice == "3":
-        objects.append(Object(HEAVY_MASS, np.array([500, 0]), np.array([0, 100])))
-        objects.append(Object(HEAVY_MASS, np.array([-500, 0]), np.array([0, -100])))
+    try:
+        n = int(choice)
+        for sort in ObjectExample:
+            if sort.value == n:
+                for o in OBJECT_EXAMPLES[sort]:
+                    objects.append(o)
+    except:
+        pass
 
     pygame.init()
     screen = pygame.display.set_mode(SIZE)
@@ -104,7 +112,7 @@ def main():
     mouse_start = np.array([0, 0])
     screen_center = CENTER_VECTOR
 
-    next_mass = 0
+    next_mass = LIGHT_MASS
     follow_num = 0
     zoom = 1
 
@@ -113,6 +121,7 @@ def main():
     moving_screen = False
     show_physical_quantity = True
     follow_object = False
+    make_object = False
 
     screen.fill(WHITE)
 
@@ -126,9 +135,9 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
 
                 if event.button == pygame.BUTTON_LEFT:
-                    pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
-                    prepare_object = True
-                    next_mass = LIGHT_MASS
+                    if make_object:
+                        pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
+                        prepare_object = True
 
                 elif event.button == pygame.BUTTON_RIGHT:
                     mouse_start = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
@@ -139,11 +148,6 @@ def main():
 
                 elif event.button == pygame.BUTTON_WHEELUP:
                     zoom *= ZOOM_RATE
-
-                elif event.button == pygame.BUTTON_MIDDLE:
-                    pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
-                    prepare_object = True
-                    next_mass = HEAVY_MASS
 
             elif event.type == pygame.KEYDOWN:
 
@@ -166,14 +170,27 @@ def main():
                     if follow_object and len(objects) > 0:
                         objects.pop(follow_num)
 
+                elif event.key == pygame.K_q:
+                    make_object = not make_object
+                    if not make_object:
+                        prepare_object = False
+
+                elif event.key == pygame.K_w:
+                    next_mass /= MASS_RATE
+
+                elif event.key == pygame.K_e:
+                    next_mass *= MASS_RATE
+
+                elif event.key == pygame.K_r:
+                    next_mass = LIGHT_MASS
+
             elif event.type == pygame.MOUSEBUTTONUP:
 
-                if event.button == pygame.BUTTON_LEFT or event.button == pygame.BUTTON_MIDDLE:
-                    if prepare_object:
-                        prepare_object = False
-                        objects.append(Object(next_mass, pos,
-                                              to_original_coord(np.array(pygame.mouse.get_pos()), screen_center,
-                                                                zoom) - pos))
+                if event.button == pygame.BUTTON_LEFT:
+                    if make_object and prepare_object:
+                        prepare_object = make_object = False
+                        velocity = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom) - pos
+                        objects.append(Object(next_mass, pos, velocity))
 
                 elif event.button == pygame.BUTTON_RIGHT:
                     moving_screen = False
@@ -190,59 +207,65 @@ def main():
             screen_center = -objects[follow_num].coord + CENTER_VECTOR
 
         if moving_screen:
-            screen_center = \
-                screen_center + to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom) - mouse_start
+            screen_center = screen_center + (
+                    to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom) - mouse_start)
             mouse_start = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
 
-        if prepare_object and len(objects) > 0:
-            pygame.draw.circle(screen, BLACK, to_screen_coord(pos, screen_center, zoom),
-                               int(next_mass ** (1 / 14) * zoom) + 2)
-            pygame.draw.line(screen, RED, to_screen_coord(pos, screen_center, zoom),
-                             pygame.mouse.get_pos(), int(3 * zoom) + 1)
+        if not prepare_object:
+            pos = to_original_coord(np.array(pygame.mouse.get_pos()), screen_center, zoom)
+
+        screen_pos = to_screen_coord(pos, screen_center, zoom)
+        if make_object:
+            pygame.draw.circle(screen, BLACK, screen_pos, int(next_mass ** (1 / 14) * zoom) + 2)
+            pygame.draw.line(screen, RED, screen_pos, pygame.mouse.get_pos(), int(3 * zoom) + 1)
+        if make_object and len(objects) > 0:
             temp_o = Object(next_mass, pos, np.array([0, 0]))
             acc_sum = np.array([0, 0])
-            mass_sum = (next_mass, pos * next_mass)
-            for o in objects:
-                acc_sum = acc_sum + o.calc_acc(temp_o)
-                mass_sum = (mass_sum[0] + o.mass, mass_sum[1] + o.coord * o.mass)
-            r = (sum(((mass_sum[1] / mass_sum[0]) - pos) ** 2) ** 0.5)
+            mass_sum = (0, np.array([0, 0]))
+
+            for sort in objects:
+                acc_sum = acc_sum + sort.calc_acc(temp_o)
+                r = sum((temp_o.coord - sort.coord) ** 2)
+                mass_sum = (mass_sum[0] + sort.mass / r, mass_sum[1] + sort.coord * sort.mass / r)
+
+            mass_center = mass_sum[1] / mass_sum[0]
+            r = sum((mass_center - pos) ** 2) ** 0.5
             a = sum(acc_sum ** 2) ** 0.5
             v = (a * r) ** 0.5
-            pygame.draw.circle(screen, BLUE, to_screen_coord(pos, screen_center, zoom), int(v * zoom), 3)
-            pygame.draw.circle(screen, RED, to_screen_coord(pos, screen_center, zoom),
-                               int((2 * G * mass_sum[0] / r) ** 0.5 * zoom), 3)
-            pygame.draw.line(screen, BLUE, to_screen_coord(mass_sum[1] / mass_sum[0], screen_center, zoom),
-                             to_screen_coord(pos, screen_center, zoom), 3)
 
-            guide1 = np.array([pos[0] + (G * mass_sum[0] / r) ** 0.5 / r * (mass_sum[1][1] / mass_sum[0] - pos[1]),
-                               pos[1] - (G * mass_sum[0] / r) ** 0.5 / r * (mass_sum[1][0] / mass_sum[0] - pos[0])])
-            guide2 = np.array([pos[0] - (G * mass_sum[0] / r) ** 0.5 / r * (mass_sum[1][1] / mass_sum[0] - pos[1]),
-                               pos[1] + (G * mass_sum[0] / r) ** 0.5 / r * (mass_sum[1][0] / mass_sum[0] - pos[0])])
+            pygame.draw.circle(screen, BLUE, screen_pos, int(v * zoom), 3)
+            pygame.draw.circle(screen, RED, screen_pos, int((2 * G * mass_sum[0] * r) ** 0.5 * zoom), 3)
+            pygame.draw.line(screen, BLUE, to_screen_coord(mass_center, screen_center, zoom), screen_pos, 3)
+
+            guide1 = np.array([pos[0] + (G * mass_sum[0] * r) ** 0.5 / r * (mass_sum[1][1] / mass_sum[0] - pos[1]),
+                               pos[1] - (G * mass_sum[0] * r) ** 0.5 / r * (mass_sum[1][0] / mass_sum[0] - pos[0])])
+            guide2 = np.array([pos[0] - (G * mass_sum[0] * r) ** 0.5 / r * (mass_sum[1][1] / mass_sum[0] - pos[1]),
+                               pos[1] + (G * mass_sum[0] * r) ** 0.5 / r * (mass_sum[1][0] / mass_sum[0] - pos[0])])
             pygame.draw.line(screen, BLUE, to_screen_coord(guide1, screen_center, zoom),
                              to_screen_coord(guide2, screen_center, zoom))
 
-        for o in objects:
-            if o == objects[follow_num] and follow_object:
+        for sort in objects:
+            if sort == objects[follow_num] and follow_object:
                 color = BLUE
             else:
                 color = BLACK
-            pygame.draw.circle(screen, color, to_screen_coord(o.coord, screen_center, zoom),
-                               int(o.mass ** (1 / 14) * zoom) + 2)
+            pygame.draw.circle(screen, color, to_screen_coord(sort.coord, screen_center, zoom),
+                               int(sort.mass ** (1 / 14) * zoom) + 2)
             if show_physical_quantity:
-                pygame.draw.line(screen, RED, to_screen_coord(o.coord, screen_center, zoom),
-                                 to_screen_coord(o.coord + o.velocity, screen_center, zoom), int(3 * zoom) + 1)
+                pygame.draw.line(screen, RED, to_screen_coord(sort.coord, screen_center, zoom),
+                                 to_screen_coord(sort.coord + sort.velocity, screen_center, zoom), int(3 * zoom) + 1)
 
         for oo in objects:
-            for o in objects:
-                if o == oo:
+            for sort in objects:
+                if sort == oo:
                     continue
-                a = oo.gravitate(o, dt)
+                a = oo.gravitate(sort, dt)
                 if show_physical_quantity:
-                    pygame.draw.line(screen, BLUE, to_screen_coord(o.coord, screen_center, zoom),
-                                     to_screen_coord(o.coord + a, screen_center, zoom), int(3 * zoom) + 1)
+                    pygame.draw.line(screen, BLUE, to_screen_coord(sort.coord, screen_center, zoom),
+                                     to_screen_coord(sort.coord + a, screen_center, zoom), int(3 * zoom) + 1)
 
-        for o in objects:
-            o.move(dt)
+        for sort in objects:
+            sort.move(dt)
 
         new_object: List[Object] = []
         for i in range(len(objects)):
