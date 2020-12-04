@@ -114,7 +114,7 @@ def main():
     screen_center = CENTER_VECTOR
 
     next_mass = LIGHT_MASS
-    follow_num = 0
+    select_num = 0
     zoom = 1
 
     tracing = False
@@ -123,7 +123,8 @@ def main():
     show_physical_quantity = True
     follow_object = False
     make_object = False
-    pause = False
+    pause = True
+    select_object = False
 
     recorded_coords: List[np.ndarray] = []
 
@@ -163,16 +164,20 @@ def main():
 
                 elif event.key == pygame.K_f:
                     follow_object = not follow_object
+                    select_object = follow_object
 
                 elif event.key == pygame.K_g:
-                    follow_num -= 1
+                    select_num -= 1
 
                 elif event.key == pygame.K_h:
-                    follow_num += 1
+                    select_num += 1
+
+                elif event.key == pygame.K_s:
+                    select_object = not select_object or follow_object
 
                 elif event.key == pygame.K_d:
-                    if follow_object and len(objects) > 0:
-                        objects.pop(follow_num)
+                    if select_object and len(objects) > 0:
+                        objects.pop(select_num)
 
                 elif event.key == pygame.K_q:
                     make_object = not make_object
@@ -189,9 +194,9 @@ def main():
                     next_mass = LIGHT_MASS
 
                 elif event.key == pygame.K_c:
-                    if follow_object:
-                        recorded_coords.append(objects[follow_num].coord.copy())
-                        print(objects[follow_num].coord)
+                    if select_object:
+                        recorded_coords.append(objects[select_num].coord.copy())
+                        print(objects[select_num].coord)
 
                 elif event.key == pygame.K_v:
                     CalcEquation.calc(recorded_coords)
@@ -214,13 +219,13 @@ def main():
         if not tracing:
             screen.fill(WHITE)
 
-        if follow_num >= len(objects):
-            follow_num = 0
-        elif follow_num < 0:
-            follow_num = len(objects) - 1
+        if select_num >= len(objects):
+            select_num = 0
+        elif select_num < 0:
+            select_num = len(objects) - 1
 
         if follow_object and len(objects) > 0:
-            screen_center = -objects[follow_num].coord + CENTER_VECTOR
+            screen_center = -objects[select_num].coord + CENTER_VECTOR
 
         if moving_screen:
             screen_center = screen_center + (
@@ -261,7 +266,9 @@ def main():
                              to_screen_coord(guide2, screen_center, zoom))
 
         for sort in objects:
-            if sort == objects[follow_num] and follow_object:
+            if sort == objects[select_num] and follow_object:
+                color = GREEN
+            elif sort == objects[select_num] and select_object:
                 color = BLUE
             else:
                 color = BLACK
