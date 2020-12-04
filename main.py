@@ -7,6 +7,7 @@ import numpy as np
 import pygame
 
 from Object import Object
+import CalcEquation
 
 # 각종 상수들
 
@@ -122,6 +123,9 @@ def main():
     show_physical_quantity = True
     follow_object = False
     make_object = False
+    pause = False
+
+    recorded_coords: List[np.ndarray] = []
 
     screen.fill(WHITE)
 
@@ -183,6 +187,18 @@ def main():
 
                 elif event.key == pygame.K_r:
                     next_mass = LIGHT_MASS
+
+                elif event.key == pygame.K_c:
+                    if follow_object:
+                        recorded_coords.append(objects[follow_num].coord.copy())
+                        print(objects[follow_num].coord)
+
+                elif event.key == pygame.K_v:
+                    CalcEquation.calc(recorded_coords)
+                    recorded_coords = []
+
+                elif event.key == pygame.K_SPACE:
+                    pause = not pause
 
             elif event.type == pygame.MOUSEBUTTONUP:
 
@@ -259,13 +275,17 @@ def main():
             for sort in objects:
                 if sort == oo:
                     continue
-                a = oo.gravitate(sort, dt)
+                if pause:
+                    a = oo.calc_acc(sort)
+                else:
+                    a = oo.gravitate(sort, dt)
                 if show_physical_quantity:
                     pygame.draw.line(screen, BLUE, to_screen_coord(sort.coord, screen_center, zoom),
                                      to_screen_coord(sort.coord + a, screen_center, zoom), int(3 * zoom) + 1)
 
-        for sort in objects:
-            sort.move(dt)
+        if not pause:
+            for sort in objects:
+                sort.move(dt)
 
         new_object: List[Object] = []
         for i in range(len(objects)):
